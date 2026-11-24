@@ -1,7 +1,7 @@
 window.LAB_CONFIG = {
   ubuntuOva: {
     title: "Ubuntu Server 26.04.1 LTS RAW szerver OVA",
-    url: "PASTE_UBUNTU_OVA_DOWNLOAD_URL_HERE",
+    url: "https://drive.google.com/file/d/1buOATxgPrlXahfs0BdFGbBg-l9yOMX1w/view?usp=drive_link",
     filename: "Ubuntu26_04_1_RAW.ova",
     size: "",
     sha256: ""
@@ -9,8 +9,8 @@ window.LAB_CONFIG = {
 
   windowsOva: {
     title: "Windows 7 x86 kliens OVA",
-    url: "PASTE_WINDOWS7_OVA_DOWNLOAD_URL_HERE",
-    filename: "https://drive.google.com/file/d/1Cgt2BQBWx8qlMnMoNC1TPYhXfmrHAS-x/view?usp=drive_link",
+    url: "https://drive.google.com/file/d/1Cgt2BQBWx8qlMnMoNC1TPYhXfmrHAS-x/view?usp=drive_link",
+    filename: "Windows7_x86_Client.ova",
     size: "",
     sha256: ""
   },
