@@ -10,7 +10,7 @@ window.LAB_CONFIG = {
   windowsOva: {
     title: "Windows 7 x86 kliens OVA",
     url: "PASTE_WINDOWS7_OVA_DOWNLOAD_URL_HERE",
-    filename: "Windows7_x86_Client.ova",
+    filename: "https://drive.google.com/file/d/1Cgt2BQBWx8qlMnMoNC1TPYhXfmrHAS-x/view?usp=drive_link",
     size: "",
     sha256: ""
   },
