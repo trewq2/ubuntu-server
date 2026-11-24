@@ -1,0 +1,20 @@
+☁️ Ubuntu Server 26.04.1 LTS szerverlabor – VirtualBox gyakorlati feladat
+
+A feladat során egy szűz Ubuntu Server 26.04.1 LTS (Resolute Raccoon) szervert fogtok teljes értékű belső hálózati kiszolgálóvá alakítani. A beállításokat egy Windows 7 x86 kliensről is ellenőrizni kell.
+
+A részletes feladat, az OVA-k és a dokumentációs Word-sablon itt érhető el:
+
+🔗 IDE ILLESZD BE A GITHUB PAGES LINKET
+
+Fő témák:
+APT és Ubuntu rendszerfelmérés → Netplan és statikus belső hálózat → SSH/PuTTY →
+felhasználók és jogosultságok → Kea DHCP → BIND9 DNS → FTP/vsftpd →
+Apache2 → nftables → hibakeresés.
+
+Minden fontos részfeladatról képernyőképet kell készíteni. A weboldal K01–K30 jelöléssel mutatja, mely képeket kell elkészíteni. Ezeket a letölthető Word sablon megfelelő helyére kell beilleszteni, majd a dokumentumot PDF-ként beadni.
+
+Beadandó fájlnév:
+Vezeteknev_Keresztnev_Ubuntu_Labor.pdf
+
+Beadási határidő:
+IDE ÍRD A HATÁRIDŐT

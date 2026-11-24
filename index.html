@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ubuntu Server 26.04.1 LTS szerverlabor – VirtualBox</title>
+<meta name="description" content="Ubuntu Server 26.04.1 LTS (Resolute Raccoon) szerverlabor VirtualBoxban – hálózat, SSH, Kea DHCP, BIND9, FTP, Apache2, nftables">
+<link rel="stylesheet" href="styles.css">
+<script src="config.js"></script><script defer src="script.js"></script>
+</head>
+<body>
+<header class="hero"><div class="wrap hero-grid">
+<div>
+<div class="eyebrow">Szerverek és felhőszolgáltatások • gyakorlati labor</div>
+<h1>Ubuntu Server 26.04.1 LTS<br>Szerverlabor</h1>
+<p class="hero-sub">VirtualBox • Netplan • APT • SSH • Kea DHCP • BIND9 • FTP • Apache2 • nftables</p>
+<p class="lead">Egy szűz Ubuntu Server LTS rendszerből működő belső hálózati kiszolgálót építesz. A szolgáltatásokat Windows 7 kliensről teszteled, és minden fontos állomást képernyőképpel bizonyítasz.</p>
+<div class="hero-buttons"><a class="btn primary" href="#indulas">Labor indítása</a><button class="btn secondary" id="printBtn">Nyomtatás / PDF</button></div>
+</div>
+<aside class="status-card">
+<label>Név<input id="studentName" placeholder="Vezetéknév Keresztnév"></label>
+<label>Osztály<input id="studentClass" placeholder="pl. 13.A"></label>
+<div class="progress-label"><span>Modulok</span><strong id="progressLabel">0%</strong></div><div class="progress"><div id="progressBar"></div></div>
+<div id="moduleCount">0 / 8 kész</div><button id="resetProgress" class="tiny">Mentett haladás törlése</button>
+</aside>
+</div></header>
+
+<nav class="topnav"><div class="wrap nav-scroll">
+<a href="#indulas">OVA-k</a><a href="#topologia">Topológia</a><a href="#modulok">Modulok</a><a href="#zaro">Záró kihívás</a><a href="#bizonyitekok">Dokumentáció</a><a href="#ertekeles">Értékelés</a>
+</div></nav>
+
+<main class="wrap">
+<section id="indulas" class="section">
+<div class="section-head"><span class="section-no">00</span><div><div class="kicker">Indulás</div><h2>Töltsd le a labor gépeit és a dokumentációs sablont</h2></div></div>
+<div class="download-grid">
+<div class="download-card"><h3 data-dl-title="ubuntu">Ubuntu Server OVA</h3><p class="download-meta" data-dl-meta="ubuntu"></p><p>A szerver szándékosan nincs előre konfigurálva: a szolgáltatásokat neked kell elkészítened.</p><div class="hash" data-dl-hash="ubuntu"></div><a class="download-btn disabled" data-dl-link="ubuntu">Link nincs beállítva</a></div>
+<div class="download-card"><h3 data-dl-title="windows">Windows 7 kliens</h3><p class="download-meta" data-dl-meta="windows"></p><p>Ezzel ellenőrzöd a DHCP, DNS, SSH, FTP és HTTP szolgáltatásokat.</p><div class="hash" data-dl-hash="windows"></div><a class="download-btn disabled" data-dl-link="windows">Link nincs beállítva</a></div>
+<div class="download-card"><h3 data-dl-title="doc">Dokumentáció</h3><p class="download-meta" data-dl-meta="doc"></p><p>A K01–K30 képernyőképeket ebbe a kész Word sablonba illeszd.</p><a class="download-btn" data-dl-link="doc">Letöltés</a></div>
+</div>
+<div class="notice"><strong>OVA import:</strong> VirtualBox → File / Import Appliance. Import után ellenőrizd a hálózati adaptereket, mielőtt elindítod a gépeket.</div>
+</section>
+
+<section id="topologia" class="section">
+<div class="section-head"><span class="section-no">01</span><div><div class="kicker">Hálózati terv</div><h2>A labor topológiája</h2></div></div>
+<div class="topology">
+<div class="node internet"><strong>Internet</strong><span>csak az Ubuntu szervernek</span></div><div class="arrow">↕ NAT</div>
+<div class="node server"><strong>Ubuntu Server 26.04.1 LTS</strong><span>NIC1: NAT / DHCP</span><span>NIC2: <span data-config-lab>UBUNTULAB</span> / <span data-config-ip>192.168.60.1/24</span></span></div>
+<div class="arrow">↔ UBUNTULAB</div><div class="node client"><strong>Windows 7 x86</strong><span>Internal Network</span><span>IP: DHCP-ből</span></div>
+</div>
+<div class="grid3">
+<div class="card"><h3>Ubuntu NIC1</h3><p><strong>VirtualBox:</strong> NAT</p><p>Internet az <code>apt update</code> és csomagtelepítés számára.</p></div>
+<div class="card"><h3>Ubuntu NIC2</h3><p><strong>Internal Network:</strong> <code>UBUNTULAB</code></p><p>Statikus cím: <code>192.168.60.1/24</code>.</p></div>
+<div class="card"><h3>Windows 7</h3><p><strong>Internal Network:</strong> <code>UBUNTULAB</code></p><p>Később Kea DHCP-től kap címet.</p></div>
+</div>
+<div class="notice"><strong>Ubuntu-specifikus megközelítés:</strong> a laborban <code>Netplan</code> kezeli a tartós hálózati beállításokat, a csomagkezelő <code>apt</code>, a tűzfalnál pedig közvetlenül az <code>nftables</code> szabályrendszert gyakoroljuk.</div>
+</section>
+
+<section id="modulok" class="section">
+<div class="section-head"><span class="section-no">02</span><div><div class="kicker">8 × 45 perc</div><h2>Egymásra épülő Ubuntu Server labor</h2></div></div>
+
+<article class="module" data-module="1">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">1. modul • 45 perc</div><h3>Ubuntu Server felmérése, APT és VirtualBox-hálózat</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> az Ubuntu LTS (Long Term Support) kiadások hosszú támogatási idejük miatt jó szerveralapot adnak. Az APT a repositorykból telepít, frissít és kezel függőségeket.</div>
+<h4 class="step-title">1. Rendszerazonosítás</h4>
+<div class="cmd" data-copy><code>cat /etc/os-release
+hostnamectl
+uname -r</code><button>Másolás</button></div>
+<div class="expected"><strong>Akkor jó:</strong> Ubuntu 26.04 LTS / Resolute környezetet látsz.</div>
+<h4 class="step-title">2. Hálózati interfészek</h4>
+<div class="cmd" data-copy><code>ip -br link
+ip -br address
+ip route</code><button>Másolás</button></div>
+<p>Gyakori VirtualBox nevek: <code>enp0s3</code> és <code>enp0s8</code>, de mindig a saját géped kimenetét használd.</p>
+<h4 class="step-title">3. Internet és csomagfrissítés</h4>
+<div class="cmd" data-copy><code>ping -c 3 1.1.1.1
+sudo apt update
+apt list --upgradable</code><button>Másolás</button></div>
+<div class="trouble"><strong>Ha nincs internet:</strong> ellenőrizd VirtualBoxban az Adapter 1 = NAT és Cable Connected beállítást, majd az <code>ip route</code> kimenetet.</div>
+<div class="evidence"><strong>K01:</strong> Ubuntu verzió + hostname.<br><strong>K02:</strong> két hálózati interfész.<br><strong>K03:</strong> sikeres internet ping és <code>apt update</code>.</div>
+<div class="mini-quiz" data-quiz="q1"></div>
+</article>
+
+<article class="module" data-module="2">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">2. modul • 45 perc</div><h3>Netplan: statikus belső IP, SSH és PuTTY</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> Ubuntu Serveren a tartós hálózati konfigurációt a <strong>Netplan</strong> YAML-fájlok írják le. A szerver belső címe állandó, így a DHCP/DNS/FTP/HTTP szolgáltatások mindig ugyanazon a címen érhetők el.</div>
+<h4 class="step-title">1. A belső interfész azonosítása</h4>
+<div class="cmd" data-copy><code>ip -br link
+ip -br address</code><button>Másolás</button></div>
+<p>A példában <code>enp0s8</code> az UBUNTULAB interfész. Ha nálad más a neve, a következő YAML-fájlban azt használd.</p>
+<h4 class="step-title">2. A meglévő Netplan-fájlok megtekintése</h4>
+<div class="cmd" data-copy><code>ls -l /etc/netplan
+sudo cat /etc/netplan/*.yaml</code><button>Másolás</button></div>
+<div class="notice"><strong>Fontos:</strong> a NAT interfész DHCP-beállítását hagyd meg. A laborhoz külön fájlban csak a belső interfészt konfiguráljuk.</div>
+<h4 class="step-title">3. Statikus UBUNTULAB-konfiguráció</h4>
+<div class="cmd" data-copy><code>sudo nano /etc/netplan/99-ubuntulab.yaml</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>network:
+  version: 2
+  ethernets:
+    enp0s8:
+      dhcp4: false
+      addresses:
+        - 192.168.60.1/24</code><button>Másolás</button></div>
+<div class="cmd" data-copy><code>sudo chmod 600 /etc/netplan/99-ubuntulab.yaml
+sudo netplan generate
+sudo netplan try</code><button>Másolás</button></div>
+<p>Ha a próba jó, fogadd el, majd:</p>
+<div class="cmd" data-copy><code>sudo netplan apply
+ip -br address
+ip route</code><button>Másolás</button></div>
+<div class="expected"><strong>Akkor jó:</strong> a belső kártyán <code>192.168.60.1/24</code> van, a default route továbbra is a NAT interfészen megy.</div>
+<h4 class="step-title">4. OpenSSH</h4>
+<div class="cmd" data-copy><code>sudo apt install -y openssh-server
+sudo systemctl enable --now ssh
+sudo systemctl status ssh --no-pager
+ss -lnt | grep :22</code><button>Másolás</button></div>
+<h4 class="step-title">5. Windows ideiglenes statikus cím</h4>
+<ul class="kv"><li>IP: <code>192.168.60.10</code></li><li>Mask: <code>255.255.255.0</code></li><li>Gateway: üres</li><li>DNS: egyelőre üres</li></ul>
+<div class="cmd" data-copy><code>ipconfig
+ping 192.168.60.1</code><button>Másolás</button></div>
+<h4 class="step-title">6. PuTTY</h4>
+<ol class="student-steps"><li>Host: <code>192.168.60.1</code></li><li>Port: <code>22</code></li><li>Connection: SSH</li><li>Jelentkezz be <code>student</code> felhasználóval.</li></ol>
+<div class="cmd" data-copy><code>whoami
+hostname
+ip -br address</code><button>Másolás</button></div>
+<div class="evidence"><strong>K04:</strong> Netplan + statikus 192.168.60.1 cím.<br><strong>K05:</strong> Windows ping.<br><strong>K06:</strong> PuTTY sikeres bejelentkezés.<br><strong>K07:</strong> <code>systemctl status ssh</code> + 22-es port.</div>
+<div class="mini-quiz" data-quiz="q2"></div>
+</article>
+
+<article class="module" data-module="3">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">3. modul • 45 perc</div><h3>Felhasználók, csoportok és fájljogosultságok</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> a Linux hozzáférés alapja az owner/group/others jogosultságrendszer. A hálózati szolgáltatások mögött ugyanazok a fájlrendszer-jogok dolgoznak.</div>
+<h4 class="step-title">1. Felhasználók és projektcsoport</h4>
+<div class="cmd" data-copy><code>sudo groupadd projekt
+sudo adduser anna
+sudo adduser bela
+sudo adduser vendeg
+sudo usermod -aG projekt anna
+sudo usermod -aG projekt bela
+id anna
+id bela
+id vendeg</code><button>Másolás</button></div>
+<h4 class="step-title">2. Labor könyvtárak</h4>
+<div class="cmd" data-copy><code>sudo mkdir -p /srv/ftp/{anna,bela,kozos,nyilvanos}
+sudo chown root:root /srv/ftp
+sudo chmod 755 /srv/ftp
+
+sudo chown anna:anna /srv/ftp/anna
+sudo chmod 700 /srv/ftp/anna
+
+sudo chown bela:bela /srv/ftp/bela
+sudo chmod 700 /srv/ftp/bela
+
+sudo chown root:projekt /srv/ftp/kozos
+sudo chmod 2770 /srv/ftp/kozos
+
+sudo chown root:root /srv/ftp/nyilvanos
+sudo chmod 755 /srv/ftp/nyilvanos
+
+echo "Ubuntu labor nyilvanos mappa" | sudo tee /srv/ftp/nyilvanos/OLVASS_EL.txt</code><button>Másolás</button></div>
+<h4 class="step-title">3. Jogosultságok értelmezése</h4>
+<div class="cmd" data-copy><code>ls -ld /srv/ftp /srv/ftp/*
+stat -c '%A %a %U %G %n' /srv/ftp/*
+namei -l /srv/ftp/kozos</code><button>Másolás</button></div>
+<h4 class="step-title">4. Pozitív és negatív teszt</h4>
+<div class="cmd" data-copy><code>sudo -u anna touch /srv/ftp/anna/anna.txt
+sudo -u anna touch /srv/ftp/kozos/anna-kozos.txt
+sudo -u bela touch /srv/ftp/kozos/bela-kozos.txt
+sudo -u vendeg touch /srv/ftp/kozos/vendeg.txt
+ls -l /srv/ftp/kozos</code><button>Másolás</button></div>
+<div class="expected"><strong>Akkor jó:</strong> anna és bela írhat, vendeg <strong>Permission denied</strong> hibát kap.</div>
+<div class="evidence"><strong>K08:</strong> felhasználók/csoportok.<br><strong>K09:</strong> rwx + numerikus jogosultságok.<br><strong>K10:</strong> vendeg tiltott írása.<br><strong>K11:</strong> közös fájlok projekt csoporttal.</div>
+<div class="mini-quiz" data-quiz="q3"></div>
+</article>
+
+<article class="module" data-module="4">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">4. modul • 45 perc</div><h3>Kea DHCP4 – automatikus Windows címzés</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> a Kea a DHCPv4-kérésekre címet, DNS-szervert és domainnevet ad. A Windows kliens ezután már nem igényel kézi IP-beállítást.</div>
+<h4 class="step-title">1. Telepítés</h4>
+<div class="cmd" data-copy><code>sudo apt update
+sudo apt install -y kea-dhcp4-server
+dpkg -l | grep kea</code><button>Másolás</button></div>
+<div class="notice"><strong>Ubuntu-megjegyzés:</strong> a teljes <code>kea</code> meta-csomag több Kea komponenst is telepít. Ebben a laborban csak az IPv4 DHCP-szerverre van szükségünk, ezért a <code>kea-dhcp4-server</code> csomagot használjuk.</div>
+<h4 class="step-title">2. Konfiguráció</h4>
+<div class="cmd" data-copy><code>sudo cp /etc/kea/kea-dhcp4.conf /etc/kea/kea-dhcp4.conf.orig
+sudo nano /etc/kea/kea-dhcp4.conf</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>{
+  "Dhcp4": {
+    "interfaces-config": {
+      "interfaces": [ "enp0s8" ]
+    },
+    "valid-lifetime": 3600,
+    "renew-timer": 900,
+    "rebind-timer": 1800,
+    "option-data": [
+      { "name": "domain-name", "data": "lab.test" },
+      { "name": "domain-name-servers", "data": "192.168.60.1" }
+    ],
+    "subnet4": [
+      {
+        "id": 1,
+        "subnet": "192.168.60.0/24",
+        "pools": [
+          { "pool": "192.168.60.100 - 192.168.60.150" }
+        ]
+      }
+    ]
+  }
+}</code><button>Másolás</button></div>
+<h4 class="step-title">3. Syntax check és indítás</h4>
+<div class="cmd" data-copy><code>sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+sudo systemctl enable --now kea-dhcp4-server
+sudo systemctl status kea-dhcp4-server --no-pager
+sudo journalctl -u kea-dhcp4-server -n 30 --no-pager</code><button>Másolás</button></div>
+<h4 class="step-title">4. Windows DHCP-re állítása</h4>
+<div class="cmd" data-copy><code>ipconfig /release
+ipconfig /renew
+ipconfig /all</code><button>Másolás</button></div>
+<div class="expected"><strong>Akkor jó:</strong> 192.168.60.100–150 közötti cím, DNS = 192.168.60.1, suffix = lab.test.</div>
+<div class="trouble"><strong>169.254.x.x?</strong> Ellenőrizd a két VM Internal Network nevét, a Kea interfésznevét és a szolgáltatás naplóját.</div>
+<div class="evidence"><strong>K12:</strong> Kea syntax OK.<br><strong>K13:</strong> szolgáltatás active.<br><strong>K14:</strong> Windows DHCP-cím.<br><strong>K15:</strong> Kea napló kliensaktivitással.</div>
+<div class="mini-quiz" data-quiz="q4"></div>
+</article>
+
+<article class="module" data-module="5">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">5. modul • 45 perc</div><h3>BIND9 DNS – saját belső névtér</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> a DNS teszi lehetővé, hogy IP-cím helyett neveket használjunk. A forward zóna A rekordokat, a reverse zóna PTR rekordot tárol.</div>
+<h4 class="step-title">1. Telepítés</h4>
+<div class="cmd" data-copy><code>sudo apt install -y bind9 bind9-utils dnsutils
+sudo systemctl status bind9 --no-pager</code><button>Másolás</button></div>
+<h4 class="step-title">2. named.conf.options</h4>
+<div class="cmd" data-copy><code>sudo cp /etc/bind/named.conf.options /etc/bind/named.conf.options.orig
+sudo nano /etc/bind/named.conf.options</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>options {
+    directory "/var/cache/bind";
+    listen-on { 127.0.0.1; 192.168.60.1; };
+    listen-on-v6 { none; };
+    allow-query { localhost; 192.168.60.0/24; };
+    recursion yes;
+    forwarders { 1.1.1.1; 8.8.8.8; };
+    dnssec-validation auto;
+};</code><button>Másolás</button></div>
+<h4 class="step-title">3. Zónák</h4>
+<div class="cmd" data-copy><code>sudo nano /etc/bind/named.conf.local</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>zone "lab.test" {
+    type master;
+    file "/etc/bind/db.lab.test";
+};
+
+zone "60.168.192.in-addr.arpa" {
+    type master;
+    file "/etc/bind/db.192.168.60";
+};</code><button>Másolás</button></div>
+<h4 class="step-title">4. Forward zóna</h4>
+<div class="cmd large" data-copy><code>sudo nano /etc/bind/db.lab.test</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>$TTL 1H
+@   IN SOA server.lab.test. admin.lab.test. (
+        2026112001
+        1H
+        15M
+        1W
+        1H )
+    IN NS server.lab.test.
+
+server  IN A 192.168.60.1
+www     IN A 192.168.60.1
+ftp     IN A 192.168.60.1</code><button>Másolás</button></div>
+<h4 class="step-title">5. Reverse zóna</h4>
+<div class="cmd large" data-copy><code>sudo nano /etc/bind/db.192.168.60</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>$TTL 1H
+@   IN SOA server.lab.test. admin.lab.test. (
+        2026112001
+        1H
+        15M
+        1W
+        1H )
+    IN NS server.lab.test.
+1   IN PTR server.lab.test.</code><button>Másolás</button></div>
+<h4 class="step-title">6. Ellenőrzés</h4>
+<div class="cmd" data-copy><code>sudo named-checkconf
+sudo named-checkzone lab.test /etc/bind/db.lab.test
+sudo named-checkzone 60.168.192.in-addr.arpa /etc/bind/db.192.168.60
+sudo systemctl restart bind9
+dig @192.168.60.1 www.lab.test +short
+dig @192.168.60.1 -x 192.168.60.1 +short</code><button>Másolás</button></div>
+<h4 class="step-title">7. Windows teszt</h4>
+<div class="cmd" data-copy><code>ipconfig /flushdns
+nslookup server.lab.test
+nslookup www.lab.test
+nslookup ftp.lab.test
+ping server.lab.test</code><button>Másolás</button></div>
+<div class="evidence"><strong>K16:</strong> named-checkconf/zóna OK.<br><strong>K17:</strong> Ubuntu dig.<br><strong>K18:</strong> Windows nslookup.<br><strong>K19:</strong> név szerinti ping.</div>
+<div class="mini-quiz" data-quiz="q5"></div>
+</article>
+
+<article class="module" data-module="6">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">6. modul • 45 perc</div><h3>vsftpd – jogosultságok hálózaton keresztül</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> az FTP-t csak az izolált oktatási hálózaton használjuk. A cél annak megértése, hogy a Linux fájljogosultságok hálózati hozzáférésnél is érvényesek.</div>
+<h4 class="step-title">1. Telepítés</h4>
+<div class="cmd" data-copy><code>sudo apt install -y vsftpd
+sudo cp /etc/vsftpd.conf /etc/vsftpd.conf.orig
+sudo nano /etc/vsftpd.conf</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>listen=YES
+listen_ipv6=NO
+anonymous_enable=NO
+local_enable=YES
+write_enable=YES
+local_umask=002
+dirmessage_enable=YES
+use_localtime=YES
+xferlog_enable=YES
+connect_from_port_20=YES
+chroot_local_user=YES
+local_root=/srv/ftp
+pasv_enable=YES
+pasv_min_port=30000
+pasv_max_port=30100
+pam_service_name=vsftpd</code><button>Másolás</button></div>
+<div class="cmd" data-copy><code>sudo systemctl enable --now vsftpd
+sudo systemctl restart vsftpd
+sudo systemctl status vsftpd --no-pager
+ss -lnt | grep :21</code><button>Másolás</button></div>
+<h4 class="step-title">2. Windows teszt</h4>
+<div class="cmd" data-copy><code>ftp ftp.lab.test</code><button>Másolás</button></div>
+<p>Anna felhasználóval:</p>
+<div class="cmd" data-copy><code>dir
+cd anna
+put anna-win.txt
+cd ..
+cd kozos
+put anna-win.txt
+cd ..
+cd bela
+quit</code><button>Másolás</button></div>
+<div class="expected"><strong>Akkor jó:</strong> anna ír az anna és kozos könyvtárba, de bela könyvtárába nem léphet.</div>
+<p>Ismételd meg <code>vendeg</code> felhasználóval: a nyilvános állomány olvasható, a közös könyvtárba írás tiltott.</p>
+<div class="cmd" data-copy><code>sudo find /srv/ftp -maxdepth 2 -type f -printf '%M %u %g %p\n'
+sudo journalctl -u vsftpd --since "15 minutes ago" --no-pager</code><button>Másolás</button></div>
+<div class="evidence"><strong>K20:</strong> vsftpd active + 21 port.<br><strong>K21:</strong> anna saját feltöltése.<br><strong>K22:</strong> anna közös feltöltése.<br><strong>K23:</strong> tiltott hozzáférés.<br><strong>K24:</strong> Ubuntu oldali owner/group lista.</div>
+<div class="mini-quiz" data-quiz="q6"></div>
+</article>
+
+<article class="module" data-module="7">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">7. modul • 45 perc</div><h3>Apache2 webszolgáltatás</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> Ubuntu Serveren az Apache csomag és szolgáltatás neve <code>apache2</code>. A tartalom alapértelmezett gyökere <code>/var/www/html</code>.</div>
+<div class="cmd" data-copy><code>sudo apt install -y apache2
+sudo systemctl enable --now apache2
+sudo systemctl status apache2 --no-pager</code><button>Másolás</button></div>
+<h4 class="step-title">1. Saját oldal</h4>
+<div class="cmd" data-copy><code>sudo nano /var/www/html/index.html</code><button>Másolás</button></div>
+<div class="cmd large" data-copy><code>&lt;!doctype html&gt;
+&lt;html lang="hu"&gt;
+&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Ubuntu labor&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;Ubuntu Server 26.04.1 LTS szerverlabor&lt;/h1&gt;
+  &lt;p&gt;Készítette: SAJÁT NÉV&lt;/p&gt;
+  &lt;ul&gt;
+    &lt;li&gt;DHCP – Kea&lt;/li&gt;
+    &lt;li&gt;DNS – BIND9&lt;/li&gt;
+    &lt;li&gt;FTP – vsftpd&lt;/li&gt;
+    &lt;li&gt;SSH – OpenSSH&lt;/li&gt;
+    &lt;li&gt;HTTP – Apache2&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/body&gt;&lt;/html&gt;</code><button>Másolás</button></div>
+<div class="cmd" data-copy><code>curl http://127.0.0.1
+curl http://www.lab.test</code><button>Másolás</button></div>
+<p>Windows böngészőben:</p><div class="urlbox">http://www.lab.test</div>
+<div class="evidence"><strong>K25:</strong> Apache2 active.<br><strong>K26:</strong> Ubuntu curl.<br><strong>K27:</strong> Windows böngésző saját weboldallal.</div>
+<div class="mini-quiz" data-quiz="q7"></div>
+</article>
+
+<article class="module" data-module="8">
+<div class="module-head"><label class="module-check"><input type="checkbox"><span></span></label><div><div class="module-meta">8. modul • 45 perc</div><h3>nftables tűzfal és integrált hibakeresés</h3></div></div>
+<div class="concept"><strong>Elmélet:</strong> a daemon futása önmagában nem elég. A kliens → hálózat → tűzfal → szolgáltatás → fájljog teljes útvonalat kell ellenőrizni.</div>
+<h4 class="step-title">1. UFW ellenőrzése, nftables telepítés és mentés</h4>
+<div class="cmd" data-copy><code>sudo ufw status</code><button>Másolás</button></div>
+<div class="notice"><strong>Ebben a laborban közvetlen nftables szabályokat használunk.</strong> Ha az UFW aktív, a tanári környezetben kapcsold ki: <code>sudo ufw disable</code>, hogy ne két külön tűzfalszabály-rendszert hibakeress egyszerre.</div>
+<div class="cmd" data-copy><code>sudo apt install -y nftables
+sudo cp /etc/nftables.conf /etc/nftables.conf.orig
+sudo nano /etc/nftables.conf</code><button>Másolás</button></div>
+<p>A példában a belső interfész <code>enp0s8</code>. Cseréld, ha nálad más.</p>
+<div class="cmd large" data-copy><code>#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0;
+        policy drop;
+
+        iif "lo" accept
+        ct state established,related accept
+        ip protocol icmp accept
+
+        iifname "enp0s8" tcp dport 22 accept
+        iifname "enp0s8" udp dport 67 accept
+        iifname "enp0s8" udp dport 53 accept
+        iifname "enp0s8" tcp dport 53 accept
+        iifname "enp0s8" tcp dport 21 accept
+        iifname "enp0s8" tcp dport 30000-30100 accept
+        iifname "enp0s8" tcp dport 80 accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0;
+        policy drop;
+    }
+
+    chain output {
+        type filter hook output priority 0;
+        policy accept;
+    }
+}</code><button>Másolás</button></div>
+<div class="cmd" data-copy><code>sudo nft -c -f /etc/nftables.conf
+sudo systemctl enable --now nftables
+sudo nft -f /etc/nftables.conf
+sudo nft -a list ruleset</code><button>Másolás</button></div>
+<h4 class="step-title">2. Szándékos HTTP tűzfalteszt</h4>
+<p>Listázd handle azonosítókkal:</p>
+<div class="cmd" data-copy><code>sudo nft -a list chain inet filter input</code><button>Másolás</button></div>
+<p>Keresd a <code>tcp dport 80 accept</code> szabály <strong>handle</strong> számát, majd ideiglenesen töröld:</p>
+<div class="cmd" data-copy><code>sudo nft delete rule inet filter input handle HANDLE_SZAM</code><button>Másolás</button></div>
+<p>Windowsból frissítsd a weboldalt: most ne működjön. Ezután töltsd vissza a mentett konfigurációt:</p>
+<div class="cmd" data-copy><code>sudo nft -f /etc/nftables.conf</code><button>Másolás</button></div>
+<h4 class="step-title">3. Integrált állapotellenőrzés</h4>
+<div class="cmd" data-copy><code>systemctl --no-pager --type=service --state=running | grep -E 'ssh|kea|named|vsftpd|apache2|nftables'
+sudo ss -lntup | grep -E ':22|:21|:53|:67|:80'
+sudo nft list ruleset</code><button>Másolás</button></div>
+<h4 class="step-title">4. Windows teljes teszt</h4>
+<div class="cmd" data-copy><code>ipconfig /all
+ping server.lab.test
+nslookup www.lab.test
+nslookup ftp.lab.test</code><button>Másolás</button></div>
+<ul class="ticks"><li>PuTTY → server.lab.test</li><li>FTP → ftp.lab.test</li><li>Böngésző → http://www.lab.test</li></ul>
+<div class="diag"><span>1. IP?</span><b>→</b><span>2. Ping?</span><b>→</b><span>3. DNS?</span><b>→</b><span>4. service?</span><b>→</b><span>5. port?</span><b>→</b><span>6. nftables?</span><b>→</b><span>7. log?</span></div>
+<div class="evidence"><strong>K28:</strong> teljes nftables szabálykészlet.<br><strong>K29:</strong> HTTP szabály törlése és visszaállítása.<br><strong>K30:</strong> végső kliensellenőrzés legalább két működő szolgáltatással.</div>
+<div class="mini-quiz" data-quiz="q8"></div>
+</article>
+</section>
+
+<section id="zaro" class="section">
+<div class="section-head"><span class="section-no">03</span><div><div class="kicker">Opcionális +45 perc</div><h2>Rendszergazda-átvételi hibajegy</h2></div></div>
+<div class="final-card"><p>A tanár egy hibát idéz elő. Nem újratelepíteni kell, hanem bizonyítékok alapján diagnosztizálni.</p>
+<div class="grid2"><div><h3>Lehetséges hibák</h3><ul class="ticks"><li>rossz statikus IP;</li><li>Kea rossz interfész;</li><li>BIND hibás A rekord;</li><li>nftables tiltja a HTTP-t;</li><li>FTP könyvtárjog hibás;</li><li>egy szolgáltatás leállt.</li></ul></div>
+<div><h3>Leadandó hibajegy</h3><ol><li>Tünet</li><li>Vizsgáló parancsok</li><li>Gyökérok</li><li>Javítás</li><li>Javítás bizonyítása</li></ol></div></div></div>
+</section>
+
+<section id="bizonyitekok" class="section">
+<div class="section-head"><span class="section-no">04</span><div><div class="kicker">Dokumentáció</div><h2>30 kötelező képernyőkép</h2></div></div>
+<div class="submit-grid"><div class="card"><h3>Haladási lista</h3><p class="small">Csak akkor pipáld ki, ha a kép bekerült a Word sablonba.</p><div id="evidenceChecklist"></div></div>
+<div class="card"><h3>Beadás</h3><ul class="ticks"><li>név, osztály, dátum;</li><li>K01–K30 sorrend;</li><li>minden képhez 1–2 mondat magyarázat;</li><li>hibánál a hibás és a javított állapot is érték;</li><li>jelszó ne legyen látható.</li></ul>
+<p><strong>Fájlnév:</strong></p><div class="cmd compact" data-copy><code>Vezeteknev_Keresztnev_Ubuntu_Labor.pdf</code><button>Másolás</button></div></div></div>
+</section>
+
+<section id="ertekeles" class="section">
+<div class="section-head"><span class="section-no">05</span><div><div class="kicker">100 pont</div><h2>Értékelés</h2></div></div>
+<div class="score-table"><table><thead><tr><th>Terület</th><th>Pont</th></tr></thead><tbody>
+<tr><td>OVA / topológia / rendszerfelmérés</td><td>8</td></tr>
+<tr><td>Hálózat + SSH/PuTTY</td><td>14</td></tr>
+<tr><td>Felhasználók + jogosultságok</td><td>16</td></tr>
+<tr><td>Kea DHCP</td><td>14</td></tr>
+<tr><td>BIND9 DNS</td><td>14</td></tr>
+<tr><td>FTP + jogosultságteszt</td><td>14</td></tr>
+<tr><td>Apache2</td><td>10</td></tr>
+<tr><td>nftables + integrált teszt</td><td>6</td></tr>
+<tr><td>Dokumentáció</td><td>4</td></tr>
+<tr class="total"><td>Összesen</td><td>100</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="resources"><h2>Hivatalos háttéranyag</h2><div class="resource-grid">
+<a href="https://ubuntu.com/download/server" target="_blank" rel="noopener">Ubuntu Server LTS</a>
+<a href="https://ubuntu.com/server/docs/about-netplan/" target="_blank" rel="noopener">Netplan</a>
+<a href="https://ubuntu.com/server/docs/how-to/networking/install-isc-kea/" target="_blank" rel="noopener">Kea DHCP</a>
+<a href="https://ubuntu.com/server/docs/how-to/networking/install-dns/" target="_blank" rel="noopener">BIND9 DNS</a>
+<a href="https://wiki.nftables.org/" target="_blank" rel="noopener">nftables</a>
+</div></section>
+</main>
+<footer><div class="wrap">Ubuntu Server 26.04.1 LTS szerverlabor • VirtualBox • GitHub Pages</div></footer>
+</body></html>

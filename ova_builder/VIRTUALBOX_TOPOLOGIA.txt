@@ -1,0 +1,27 @@
+UBUNTU SERVER 26.04.1 LTS VIRTUALBOX LABORTOPOLOGIA
+
+UBUNTU SERVER
+Adapter 1: NAT
+  - internet / apt
+  - DHCP a VirtualBox NAT-tól
+
+Adapter 2: Internal Network
+  - név: UBUNTULAB
+  - tanuló által Netplannel beállítandó cím: 192.168.60.1/24
+  - ezen az interfészen ne legyen default gateway
+
+WINDOWS 7 x86 KLIENS
+Adapter 1: Internal Network
+  - név: UBUNTULAB
+  - a 2. modulban ideiglenesen 192.168.60.10/24
+  - a 4. modultól DHCP
+
+KEA DHCP
+Pool: 192.168.60.100–150
+DNS: 192.168.60.1
+Domain: lab.test
+
+BIND9
+server.lab.test = 192.168.60.1
+www.lab.test    = 192.168.60.1
+ftp.lab.test    = 192.168.60.1
